@@ -1,6 +1,8 @@
+import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
+    Alert,
     AppState,
     FlatList,
     Image,
@@ -8,16 +10,28 @@ import {
     Pressable,
     StyleSheet,
     Text,
+    TextInput,
     View,
 } from 'react-native';
 import { useItems } from '../../context/ItemsContext';
 import { CampusItem } from '../../data/mockItems';
 
 export default function FeedScreen() {
-  const { items } = useItems();
+  const itemsContext = useItems() as any;
+  const items = itemsContext.items ?? [];
+  const addItem = itemsContext.addItem ?? (() => undefined);
 
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [modalVisible, setModalVisible] = useState<boolean>(false);
+  const [filterModalVisible, setFilterModalVisible] = useState<boolean>(false);
+
+  // Add Lost/Found Item Modal States
+  const [addModalVisible, setAddModalVisible] = useState<boolean>(false);
+  const [title, setTitle] = useState('');
+  const [category, setCategory] = useState<'Lost' | 'Found' | 'Exchange'>('Lost');
+  const [location, setLocation] = useState('');
+  const [contact, setContact] = useState('');
+  const [handover, setHandover] = useState('');
+  const [description, setDescription] = useState('');
 
   // AppState listener to detect background -> foreground transitions
   const appState = useRef(AppState.currentState);
@@ -31,7 +45,6 @@ export default function FeedScreen() {
       ) {
         const now = new Date().toLocaleTimeString();
         setBoardStatus(`Synced on resume: ${now}`);
-        console.log('App returned to foreground at:', now);
       }
       appState.current = nextAppState;
     });
@@ -39,10 +52,54 @@ export default function FeedScreen() {
     return () => subscription.remove();
   }, []);
 
+  const handleAddItem = async () => {
+    if (!title.trim() || !location.trim() || !contact.trim()) {
+      Alert.alert('Missing Info', 'Please enter item title, location, and contact.');
+      return;
+    }
+
+    const today = new Date().toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+
+    addItem({
+      title: title.trim(),
+      category,
+      location: location.trim(),
+      date: today,
+      contact: contact.trim(),
+      handover: handover.trim() || 'Contact poster directly',
+      description: description.trim() || 'No additional description provided.',
+    });
+
+    // Reset form & close modal
+    setTitle('');
+    setCategory('Lost');
+    setLocation('');
+    setContact('');
+    setHandover('');
+    setDescription('');
+    setAddModalVisible(false);
+
+    // Trigger local notification
+    const { status } = await Notifications.requestPermissionsAsync();
+    if (status === 'granted') {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `${category} Item Posted!`,
+          body: `"${title.trim()}" is now live on the UniFind campus board.`,
+        },
+        trigger: null,
+      });
+    }
+  };
+
   const filteredItems =
     selectedCategory === 'All'
       ? items
-      : items.filter((item) => item.category === selectedCategory);
+      : items.filter((item: CampusItem) => item.category === selectedCategory);
 
   const renderItem = ({ item }: { item: CampusItem }) => (
     <Pressable
@@ -79,18 +136,26 @@ export default function FeedScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Top Status & Filter Bar */}
+      {/* Top Status & Action Bar */}
       <View style={styles.topBar}>
         <Text style={styles.statusText}>{boardStatus}</Text>
-        <Pressable
-          style={({ pressed }) => [styles.filterBtn, pressed && { opacity: 0.7 }]}
-          onPress={() => setModalVisible(true)}
-        >
-          <Text style={styles.filterBtnText}>Filter: {selectedCategory}</Text>
-        </Pressable>
+        <View style={styles.topActions}>
+          <Pressable
+            style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.7 }]}
+            onPress={() => setAddModalVisible(true)}
+          >
+            <Text style={styles.filterBtnText}>+ Report</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.filterBtn, pressed && { opacity: 0.7 }]}
+            onPress={() => setFilterModalVisible(true)}
+          >
+            <Text style={styles.filterBtnText}>Filter: {selectedCategory}</Text>
+          </Pressable>
+        </View>
       </View>
 
-      {/* Hard-coded data rendered via FlatList */}
+      {/* Hard-coded + newly added data rendered via FlatList */}
       <FlatList
         data={filteredItems}
         keyExtractor={(item) => item.id}
@@ -98,12 +163,12 @@ export default function FeedScreen() {
         contentContainerStyle={{ paddingBottom: 20 }}
       />
 
-      {/* Modal for filtering data */}
+      {/* Modal 1: Filter by Category */}
       <Modal
-        visible={modalVisible}
+        visible={filterModalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={() => setFilterModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -117,7 +182,7 @@ export default function FeedScreen() {
                 ]}
                 onPress={() => {
                   setSelectedCategory(cat);
-                  setModalVisible(false);
+                  setFilterModalVisible(false);
                 }}
               >
                 <Text
@@ -132,10 +197,91 @@ export default function FeedScreen() {
             ))}
             <Pressable
               style={styles.cancelBtn}
-              onPress={() => setModalVisible(false)}
+              onPress={() => setFilterModalVisible(false)}
             >
               <Text style={{ color: '#555', fontWeight: 'bold' }}>Close</Text>
             </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal 2: Report Lost / Found / Exchange Item */}
+      <Modal
+        visible={addModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAddModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Report Campus Item</Text>
+
+            {/* Category Selector */}
+            <View style={styles.catRow}>
+              {(['Lost', 'Found', 'Exchange'] as const).map((cat) => (
+                <Pressable
+                  key={cat}
+                  style={[
+                    styles.catChip,
+                    category === cat && styles.catChipActive,
+                  ]}
+                  onPress={() => setCategory(cat)}
+                >
+                  <Text
+                    style={[
+                      styles.catChipText,
+                      category === cat && { color: 'white' },
+                    ]}
+                  >
+                    {cat}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Item Title (e.g., Blue Umbrella) *"
+              value={title}
+              onChangeText={setTitle}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Location (e.g., Science Library) *"
+              value={location}
+              onChangeText={setLocation}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Your Name & Phone *"
+              value={contact}
+              onChangeText={setContact}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Handover Point (e.g., Security Counter)"
+              value={handover}
+              onChangeText={setHandover}
+            />
+            <TextInput
+              style={[styles.input, { height: 65, textAlignVertical: 'top' }]}
+              placeholder="Short description..."
+              multiline
+              value={description}
+              onChangeText={setDescription}
+            />
+
+            <View style={styles.formActions}>
+              <Pressable
+                style={styles.formCancelBtn}
+                onPress={() => setAddModalVisible(false)}
+              >
+                <Text style={{ fontWeight: 'bold', color: '#4b5563' }}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.submitBtn} onPress={handleAddItem}>
+                <Text style={{ color: 'white', fontWeight: 'bold' }}>Post Item</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -154,11 +300,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 12,
   },
-  statusText: { fontSize: 12, fontWeight: 'bold', color: '#1E3A8A', flex: 1 },
+  statusText: { fontSize: 11, fontWeight: 'bold', color: '#1E3A8A', flex: 1 },
+  topActions: { flexDirection: 'row', gap: 6 },
+  addBtn: {
+    backgroundColor: '#059669',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+  },
   filterBtn: {
     backgroundColor: '#1E3A8A',
     paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     borderRadius: 6,
   },
   filterBtnText: { color: 'white', fontWeight: 'bold', fontSize: 12 },
@@ -204,8 +357,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalBox: { width: '80%', backgroundColor: 'white', padding: 20, borderRadius: 10 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
+  modalBox: { width: '88%', backgroundColor: 'white', padding: 20, borderRadius: 12 },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 14, textAlign: 'center' },
   modalOption: {
     padding: 12,
     backgroundColor: '#f3f4f6',
@@ -216,4 +369,31 @@ const styles = StyleSheet.create({
   modalOptionActive: { backgroundColor: '#1E3A8A' },
   modalOptionText: { fontSize: 15, fontWeight: 'bold' },
   cancelBtn: { marginTop: 10, alignItems: 'center', padding: 8 },
+  catRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, gap: 6 },
+  catChip: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+  },
+  catChipActive: { backgroundColor: '#1E3A8A' },
+  catChipText: { fontWeight: 'bold', fontSize: 13, color: '#1f2937' },
+  input: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 10,
+    fontSize: 14,
+  },
+  formActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 6 },
+  formCancelBtn: { paddingVertical: 10, paddingHorizontal: 14 },
+  submitBtn: {
+    backgroundColor: '#059669',
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 8,
+  },
 });

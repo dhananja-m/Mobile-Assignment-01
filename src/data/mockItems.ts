@@ -13,7 +13,7 @@ export interface CampusItem {
 }
 
 // Uses local asset images already included in Expo so they never fail offline
-const defaultImg = require('../../assets/images/react-logo.png');
+const defaultImg = require('../../assets/images/icon.png');
 
 export const INITIAL_ITEMS: CampusItem[] = [
   {
