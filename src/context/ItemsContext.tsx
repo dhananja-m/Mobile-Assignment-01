@@ -6,11 +6,16 @@ interface NewItemInput extends Omit<CampusItem, 'id' | 'isSaved' | 'isClaimed' |
   imageUri?: string | null;
 }
 
+interface UpdateItemInput extends Omit<CampusItem, 'isSaved' | 'isClaimed' | 'image'> {
+  imageUri?: string | null;
+}
+
 interface ItemsContextType {
   items: CampusItem[];
   toggleSave: (id: string) => void;
   markAsClaimed: (id: string) => void;
   addItem: (newItem: NewItemInput) => void;
+  updateItem: (updatedItem: UpdateItemInput) => void;
 }
 
 const ItemsContext = createContext<ItemsContextType | undefined>(undefined);
@@ -52,8 +57,23 @@ export function ItemsProvider({ children }: { children: React.ReactNode }) {
     setItems((prev) => [createdItem, ...prev]);
   };
 
+  const updateItem = ({ id, imageUri, ...rest }: UpdateItemInput) => {
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        return {
+          ...item,
+          ...rest,
+          image: imageUri ? { uri: imageUri } : item.image,
+        };
+      })
+    );
+  };
+
   return (
-    <ItemsContext.Provider value={{ items, toggleSave, markAsClaimed, addItem }}>
+    <ItemsContext.Provider
+      value={{ items, toggleSave, markAsClaimed, addItem, updateItem }}
+    >
       {children}
     </ItemsContext.Provider>
   );
