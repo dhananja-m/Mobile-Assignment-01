@@ -1,16 +1,21 @@
 import React, { createContext, useContext, useState } from 'react';
+import { ImageSourcePropType } from 'react-native';
 import { CampusItem, INITIAL_ITEMS } from '../data/mockItems';
+
+interface NewItemInput extends Omit<CampusItem, 'id' | 'isSaved' | 'isClaimed' | 'image'> {
+  imageUri?: string | null;
+}
 
 interface ItemsContextType {
   items: CampusItem[];
   toggleSave: (id: string) => void;
   markAsClaimed: (id: string) => void;
-  addItem: (newItem: Omit<CampusItem, 'id' | 'isSaved' | 'isClaimed' | 'image'>) => void;
+  addItem: (newItem: NewItemInput) => void;
 }
 
 const ItemsContext = createContext<ItemsContextType | undefined>(undefined);
 
-// Make sure this path matches the exact image path in your mockItems.ts!
+// Make sure this path matches your working path in mockItems.ts!
 const defaultImg = require('../../assets/images/icon.png');
 
 export function ItemsProvider({ children }: { children: React.ReactNode }) {
@@ -32,13 +37,15 @@ export function ItemsProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const addItem = (
-    newItem: Omit<CampusItem, 'id' | 'isSaved' | 'isClaimed' | 'image'>
-  ) => {
+  const addItem = ({ imageUri, ...rest }: NewItemInput) => {
+    const imageSource: ImageSourcePropType = imageUri
+      ? { uri: imageUri }
+      : defaultImg;
+
     const createdItem: CampusItem = {
-      ...newItem,
+      ...rest,
       id: Date.now().toString(),
-      image: defaultImg,
+      image: imageSource,
       isSaved: false,
       isClaimed: false,
     };
