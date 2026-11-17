@@ -20,10 +20,10 @@ export default function RootLayout() {
         <Tabs.Screen
           name="(feed)"
           options={{
-            title: 'Campus Feed',
+            title: 'Home',
             headerShown: false, // Hidden because the Stack inside (feed) has its own header
             tabBarIcon: ({ color }) => (
-              <MaterialCommunityIcons name="compass-outline" size={24} color={String(color)} />
+              <MaterialCommunityIcons name="home-outline" size={24} color={String(color)} />
             ),
           }}
         />
