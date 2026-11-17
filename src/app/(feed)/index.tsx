@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
@@ -23,6 +24,7 @@ type SortOption = 'newest' | 'oldest' | 'nameAsc' | 'nameDesc';
 export default function FeedScreen() {
   const { items, addItem } = useItems();
 
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [filterModalVisible, setFilterModalVisible] = useState<boolean>(false);
@@ -130,11 +132,21 @@ export default function FeedScreen() {
     }
   };
 
-  // 1. Filter by Category
-  const filteredItems =
-    selectedCategory === 'All'
-      ? items
-      : items.filter((item) => item.category === selectedCategory);
+  // 1. Filter by Category + Real-Time Search Query
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+
+  const filteredItems = items.filter((item) => {
+    const matchesCategory =
+      selectedCategory === 'All' || item.category === selectedCategory;
+
+    const matchesSearch =
+      !normalizedQuery ||
+      item.title.toLowerCase().includes(normalizedQuery) ||
+      item.location.toLowerCase().includes(normalizedQuery) ||
+      item.description.toLowerCase().includes(normalizedQuery);
+
+    return matchesCategory && matchesSearch;
+  });
 
   // 2. Sort Filtered Results (Time-wise & Name-wise)
   const displayedItems = [...filteredItems].sort((a, b) => {
@@ -144,14 +156,12 @@ export default function FeedScreen() {
     if (sortBy === 'nameDesc') {
       return b.title.localeCompare(a.title);
     }
-    // Parse date strings (falls back to numeric ID timestamp if dates match)
     const timeA = new Date(a.date).getTime() || Number(a.id) || 0;
     const timeB = new Date(b.date).getTime() || Number(b.id) || 0;
 
     if (sortBy === 'oldest') {
       return timeA - timeB;
     }
-    // Default: 'newest'
     return timeB - timeA;
   });
 
@@ -216,11 +226,39 @@ export default function FeedScreen() {
         </View>
       </View>
 
+      {/* Real-Time Search Bar */}
+      <View style={styles.searchContainer}>
+        <MaterialCommunityIcons name="magnify" size={20} color="#6b7280" />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search items, locations, or keywords..."
+          placeholderTextColor="#9ca3af"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          returnKeyType="search"
+          autoCorrect={false}
+        />
+        {searchQuery.length > 0 && (
+          <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+            <MaterialCommunityIcons name="close-circle" size={18} color="#6b7280" />
+          </Pressable>
+        )}
+      </View>
+
       <FlatList
         data={displayedItems}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        contentContainerStyle={{ paddingBottom: 20 }}
+        contentContainerStyle={{ paddingBottom: 20, flexGrow: 1 }}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <MaterialCommunityIcons name="file-search-outline" size={44} color="#9ca3af" />
+            <Text style={styles.emptyTitle}>No matching items found</Text>
+            <Text style={styles.emptySubtitle}>
+              Try clearing your search or switching the category filter.
+            </Text>
+          </View>
+        }
       />
 
       {/* Modal 1: Filter & Sort */}
@@ -397,7 +435,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#dbeafe',
     padding: 10,
     borderRadius: 8,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   statusText: { fontSize: 11, fontWeight: 'bold', color: '#1E3A8A', flex: 1 },
   topActions: { flexDirection: 'row', gap: 6 },
@@ -414,6 +452,44 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   filterBtnText: { color: 'white', fontWeight: 'bold', fontSize: 12 },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    elevation: 1,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#111827',
+    paddingVertical: 0,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginTop: 10,
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginTop: 4,
+    paddingHorizontal: 20,
+  },
   card: {
     flexDirection: 'row',
     backgroundColor: 'white',
