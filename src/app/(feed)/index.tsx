@@ -1,3 +1,4 @@
+import * as ImagePicker from 'expo-image-picker';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -8,6 +9,7 @@ import {
     Image,
     Modal,
     Pressable,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -16,12 +18,13 @@ import {
 import { useItems } from '../../context/ItemsContext';
 import { CampusItem } from '../../data/mockItems';
 
+type SortOption = 'newest' | 'oldest' | 'nameAsc' | 'nameDesc';
+
 export default function FeedScreen() {
-  const itemsContext = useItems() as any;
-  const items = itemsContext.items ?? [];
-  const addItem = itemsContext.addItem ?? (() => undefined);
+  const { items, addItem } = useItems();
 
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [filterModalVisible, setFilterModalVisible] = useState<boolean>(false);
 
   // Add Lost/Found Item Modal States
@@ -32,8 +35,9 @@ export default function FeedScreen() {
   const [contact, setContact] = useState('');
   const [handover, setHandover] = useState('');
   const [description, setDescription] = useState('');
+  const [imageUri, setImageUri] = useState<string | null>(null);
 
-  // AppState listener to detect background -> foreground transitions
+  // AppState listener
   const appState = useRef(AppState.currentState);
   const [boardStatus, setBoardStatus] = useState<string>('Active (Just now)');
 
@@ -52,6 +56,28 @@ export default function FeedScreen() {
     return () => subscription.remove();
   }, []);
 
+  const pickImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        'Permission Required',
+        'Please allow photo library access to attach an item photo.'
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (!result.canceled && result.assets.length > 0) {
+      setImageUri(result.assets[0].uri);
+    }
+  };
+
   const handleAddItem = async () => {
     if (!title.trim() || !location.trim() || !contact.trim()) {
       Alert.alert('Missing Info', 'Please enter item title, location, and contact.');
@@ -64,14 +90,17 @@ export default function FeedScreen() {
       year: 'numeric',
     });
 
+    const submittedTitle = title.trim();
+
     addItem({
-      title: title.trim(),
+      title: submittedTitle,
       category,
       location: location.trim(),
       date: today,
       contact: contact.trim(),
       handover: handover.trim() || 'Contact poster directly',
       description: description.trim() || 'No additional description provided.',
+      imageUri,
     });
 
     // Reset form & close modal
@@ -81,25 +110,50 @@ export default function FeedScreen() {
     setContact('');
     setHandover('');
     setDescription('');
+    setImageUri(null);
     setAddModalVisible(false);
 
-    // Trigger local notification
-    const { status } = await Notifications.requestPermissionsAsync();
-    if (status === 'granted') {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: `${category} Item Posted!`,
-          body: `"${title.trim()}" is now live on the UniFind campus board.`,
-        },
-        trigger: null,
-      });
+    // Trigger local notification safely
+    try {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status === 'granted') {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: `${category} Item Posted!`,
+            body: `"${submittedTitle}" is now live on the UniFind campus board.`,
+          },
+          trigger: null,
+        });
+      }
+    } catch (error) {
+      console.log('Notification error:', error);
     }
   };
 
+  // 1. Filter by Category
   const filteredItems =
     selectedCategory === 'All'
       ? items
-      : items.filter((item: CampusItem) => item.category === selectedCategory);
+      : items.filter((item) => item.category === selectedCategory);
+
+  // 2. Sort Filtered Results (Time-wise & Name-wise)
+  const displayedItems = [...filteredItems].sort((a, b) => {
+    if (sortBy === 'nameAsc') {
+      return a.title.localeCompare(b.title);
+    }
+    if (sortBy === 'nameDesc') {
+      return b.title.localeCompare(a.title);
+    }
+    // Parse date strings (falls back to numeric ID timestamp if dates match)
+    const timeA = new Date(a.date).getTime() || Number(a.id) || 0;
+    const timeB = new Date(b.date).getTime() || Number(b.id) || 0;
+
+    if (sortBy === 'oldest') {
+      return timeA - timeB;
+    }
+    // Default: 'newest'
+    return timeB - timeA;
+  });
 
   const renderItem = ({ item }: { item: CampusItem }) => (
     <Pressable
@@ -134,6 +188,13 @@ export default function FeedScreen() {
     </Pressable>
   );
 
+  const sortOptions: { key: SortOption; label: string }[] = [
+    { key: 'newest', label: 'Time: Newest First' },
+    { key: 'oldest', label: 'Time: Oldest First' },
+    { key: 'nameAsc', label: 'Name: A → Z' },
+    { key: 'nameDesc', label: 'Name: Z → A' },
+  ];
+
   return (
     <View style={styles.container}>
       {/* Top Status & Action Bar */}
@@ -150,20 +211,19 @@ export default function FeedScreen() {
             style={({ pressed }) => [styles.filterBtn, pressed && { opacity: 0.7 }]}
             onPress={() => setFilterModalVisible(true)}
           >
-            <Text style={styles.filterBtnText}>Filter: {selectedCategory}</Text>
+            <Text style={styles.filterBtnText}>Filter & Sort</Text>
           </Pressable>
         </View>
       </View>
 
-      {/* Hard-coded + newly added data rendered via FlatList */}
       <FlatList
-        data={filteredItems}
+        data={displayedItems}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={{ paddingBottom: 20 }}
       />
 
-      {/* Modal 1: Filter by Category */}
+      {/* Modal 1: Filter & Sort */}
       <Modal
         visible={filterModalVisible}
         transparent
@@ -172,35 +232,60 @@ export default function FeedScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Filter by Category</Text>
-            {['All', 'Found', 'Lost', 'Exchange'].map((cat) => (
-              <Pressable
-                key={cat}
-                style={[
-                  styles.modalOption,
-                  selectedCategory === cat && styles.modalOptionActive,
-                ]}
-                onPress={() => {
-                  setSelectedCategory(cat);
-                  setFilterModalVisible(false);
-                }}
-              >
-                <Text
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalTitle}>Filter & Sort Feed</Text>
+
+              <Text style={styles.sectionHeader}>Category</Text>
+              <View style={styles.catRow}>
+                {['All', 'Found', 'Lost', 'Exchange'].map((cat) => (
+                  <Pressable
+                    key={cat}
+                    style={[
+                      styles.catChip,
+                      selectedCategory === cat && styles.catChipActive,
+                    ]}
+                    onPress={() => setSelectedCategory(cat)}
+                  >
+                    <Text
+                      style={[
+                        styles.catChipText,
+                        selectedCategory === cat && { color: 'white' },
+                      ]}
+                    >
+                      {cat}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <Text style={styles.sectionHeader}>Sort By</Text>
+              {sortOptions.map((option) => (
+                <Pressable
+                  key={option.key}
                   style={[
-                    styles.modalOptionText,
-                    selectedCategory === cat && { color: 'white' },
+                    styles.modalOption,
+                    sortBy === option.key && styles.modalOptionActive,
                   ]}
+                  onPress={() => setSortBy(option.key)}
                 >
-                  {cat}
-                </Text>
+                  <Text
+                    style={[
+                      styles.modalOptionText,
+                      sortBy === option.key && { color: 'white' },
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))}
+
+              <Pressable
+                style={styles.applyBtn}
+                onPress={() => setFilterModalVisible(false)}
+              >
+                <Text style={{ color: 'white', fontWeight: 'bold' }}>Apply</Text>
               </Pressable>
-            ))}
-            <Pressable
-              style={styles.cancelBtn}
-              onPress={() => setFilterModalVisible(false)}
-            >
-              <Text style={{ color: '#555', fontWeight: 'bold' }}>Close</Text>
-            </Pressable>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -214,74 +299,88 @@ export default function FeedScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Report Campus Item</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalTitle}>Report Campus Item</Text>
 
-            {/* Category Selector */}
-            <View style={styles.catRow}>
-              {(['Lost', 'Found', 'Exchange'] as const).map((cat) => (
-                <Pressable
-                  key={cat}
-                  style={[
-                    styles.catChip,
-                    category === cat && styles.catChipActive,
-                  ]}
-                  onPress={() => setCategory(cat)}
-                >
-                  <Text
+              {/* Category Selector */}
+              <View style={styles.catRow}>
+                {(['Lost', 'Found', 'Exchange'] as const).map((cat) => (
+                  <Pressable
+                    key={cat}
                     style={[
-                      styles.catChipText,
-                      category === cat && { color: 'white' },
+                      styles.catChip,
+                      category === cat && styles.catChipActive,
                     ]}
+                    onPress={() => setCategory(cat)}
                   >
-                    {cat}
+                    <Text
+                      style={[
+                        styles.catChipText,
+                        category === cat && { color: 'white' },
+                      ]}
+                    >
+                      {cat}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              {/* Photo Picker Section */}
+              <View style={styles.photoRow}>
+                <Pressable style={styles.photoBtn} onPress={pickImage}>
+                  <Text style={styles.photoBtnText}>
+                    {imageUri ? 'Change Photo' : '+ Attach Photo'}
                   </Text>
                 </Pressable>
-              ))}
-            </View>
+                {imageUri && (
+                  <Image source={{ uri: imageUri }} style={styles.previewImg} />
+                )}
+              </View>
 
-            <TextInput
-              style={styles.input}
-              placeholder="Item Title (e.g., Blue Umbrella) *"
-              value={title}
-              onChangeText={setTitle}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Location (e.g., Science Library) *"
-              value={location}
-              onChangeText={setLocation}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Your Name & Phone *"
-              value={contact}
-              onChangeText={setContact}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Handover Point (e.g., Security Counter)"
-              value={handover}
-              onChangeText={setHandover}
-            />
-            <TextInput
-              style={[styles.input, { height: 65, textAlignVertical: 'top' }]}
-              placeholder="Short description..."
-              multiline
-              value={description}
-              onChangeText={setDescription}
-            />
+              <TextInput
+                style={styles.input}
+                placeholder="Item Title (e.g., Blue Umbrella) *"
+                value={title}
+                onChangeText={setTitle}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Location (e.g., Science Library) *"
+                value={location}
+                onChangeText={setLocation}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Your Name & Phone *"
+                value={contact}
+                onChangeText={setContact}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Handover Point (e.g., Security Counter)"
+                value={handover}
+                onChangeText={setHandover}
+              />
+              <TextInput
+                style={[styles.input, { height: 65, textAlignVertical: 'top' }]}
+                placeholder="Short description..."
+                multiline
+                value={description}
+                onChangeText={setDescription}
+              />
 
-            <View style={styles.formActions}>
-              <Pressable
-                style={styles.formCancelBtn}
-                onPress={() => setAddModalVisible(false)}
-              >
-                <Text style={{ fontWeight: 'bold', color: '#4b5563' }}>Cancel</Text>
-              </Pressable>
-              <Pressable style={styles.submitBtn} onPress={handleAddItem}>
-                <Text style={{ color: 'white', fontWeight: 'bold' }}>Post Item</Text>
-              </Pressable>
-            </View>
+              <View style={styles.formActions}>
+                <Pressable
+                  style={styles.formCancelBtn}
+                  onPress={() => setAddModalVisible(false)}
+                >
+                  <Text style={{ fontWeight: 'bold', color: '#4b5563' }}>Cancel</Text>
+                </Pressable>
+                <Pressable style={styles.submitBtn} onPress={handleAddItem}>
+                  <Text style={{ color: 'white', fontWeight: 'bold' }}>Post Item</Text>
+                </Pressable>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -324,7 +423,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   cardPressed: { opacity: 0.7 },
-  thumbnail: { width: 70, height: 70, borderRadius: 8, resizeMode: 'contain' },
+  thumbnail: { width: 70, height: 70, borderRadius: 8, resizeMode: 'cover' },
   cardContent: { flex: 1, marginLeft: 12, justifyContent: 'center' },
   badgeRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   badge: {
@@ -357,18 +456,37 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalBox: { width: '88%', backgroundColor: 'white', padding: 20, borderRadius: 12 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 14, textAlign: 'center' },
+  modalBox: {
+    width: '88%',
+    maxHeight: '85%',
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 12,
+  },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12, textAlign: 'center' },
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#4b5563',
+    marginBottom: 6,
+    marginTop: 4,
+  },
   modalOption: {
-    padding: 12,
+    padding: 10,
     backgroundColor: '#f3f4f6',
     borderRadius: 8,
     marginBottom: 8,
     alignItems: 'center',
   },
   modalOptionActive: { backgroundColor: '#1E3A8A' },
-  modalOptionText: { fontSize: 15, fontWeight: 'bold' },
-  cancelBtn: { marginTop: 10, alignItems: 'center', padding: 8 },
+  modalOptionText: { fontSize: 14, fontWeight: 'bold', color: '#1f2937' },
+  applyBtn: {
+    marginTop: 8,
+    backgroundColor: '#059669',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
   catRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, gap: 6 },
   catChip: {
     flex: 1,
@@ -378,7 +496,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   catChipActive: { backgroundColor: '#1E3A8A' },
-  catChipText: { fontWeight: 'bold', fontSize: 13, color: '#1f2937' },
+  catChipText: { fontWeight: 'bold', fontSize: 12, color: '#1f2937' },
+  photoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  photoBtn: {
+    backgroundColor: '#e0e7ff',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+  },
+  photoBtnText: { color: '#1E3A8A', fontWeight: 'bold', fontSize: 13 },
+  previewImg: { width: 50, height: 50, borderRadius: 8 },
   input: {
     borderWidth: 1,
     borderColor: '#d1d5db',

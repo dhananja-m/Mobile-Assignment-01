@@ -1,56 +1,53 @@
-# Welcome to your Expo app 👋
+# UniFind — Campus Lost & Found + Item Exchange App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+**UniFind** is a cross-platform mobile application built with **React Native** and **Expo** to help university students report, track, bookmark, and claim lost, found, or exchangeable items across campus.
 
-## Get started
+---
 
-1. Install dependencies
+## 📱 Features Implemented
 
-   ```bash
-   npm install
-   ```
+- **Campus Feed (`FlatList`)**: Displays real-time Lost, Found, and Exchange item listings with category badges, location metadata, dates, and thumbnail previews.
+- **Report New Items (`Modal` + `ImagePicker`)**: Allows students to post new Lost, Found, or Exchange items with custom titles, locations, contact details, handover points, descriptions, and device gallery photos (`expo-image-picker`).
+- **Category Filtering (`Modal`)**: Interactive filter modal to sort items by **All**, **Found**, **Lost**, or **Exchange**.
+- **Tab + Nested Stack Navigation (`Expo Router`)**:
+  - **Campus Feed Tab**: Contains a nested stack navigator for the main feed (`index.tsx`) and full item inspection (`details.tsx`).
+  - **My Saved Items Tab (`saved.tsx`)**: Displays bookmarked and claimed items synced across the app.
+- **Shared Global State (`React Context` + `useState`)**: Managed via `ItemsContext.tsx` so reporting, bookmarking, or marking an item as claimed updates the Feed, Details, and Saved screens simultaneously.
+- **App Lifecycle Awareness (`AppState`)**: Monitors background-to-foreground app transitions and updates the board sync timestamp automatically upon resume.
+- **Local Push Notifications (`expo-notifications`)**: Triggers immediate local notifications when a student posts a new campus item or marks an item as claimed.
 
-2. Start the app
+---
 
-   ```bash
-   npx expo start
-   ```
+## 🛠️ Tech Stack & Dependencies
 
-In the output, you'll find options to open the app in a
+- **Framework**: React Native (Expo SDK)
+- **Routing**: Expo Router (`Tabs` & `Stack`)
+- **Language**: TypeScript
+- **State Management**: React Context API (`useState`, `useContext`)
+- **Native Modules**:
+  - `expo-notifications` (Local notifications)
+  - `expo-image-picker` (Photo uploads from gallery)
+  - `@expo/vector-icons` (`MaterialCommunityIcons` tab icons)
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+---
 
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## 📂 Project Structure
 
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
-
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```text
+LostAndFound/
+├── assets/
+│   └── images/              # Default fallback app icons & assets
+├── src/
+│   ├── app/
+│   │   ├── _layout.tsx      # Root Tab Navigator & ItemsProvider wrapper
+│   │   ├── saved.tsx        # Saved & Claimed items screen
+│   │   └── (feed)/
+│   │       ├── _layout.tsx  # Nested Stack Navigator for Feed
+│   │       ├── index.tsx    # Main FlatList feed, Filter Modal & Report Modal
+│   │       └── details.tsx  # Full item details, bookmark & claim actions
+│   ├── context/
+│   │   └── ItemsContext.tsx # Global shared state & reducer actions
+│   └── data/
+│       └── mockItems.ts     # TypeScript interfaces & initial campus dataset
+├── package.json
+└── README.md

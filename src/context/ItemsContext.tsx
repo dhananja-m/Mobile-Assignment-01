@@ -1,13 +1,27 @@
-import React, { createContext, useState, useContext } from 'react';
-import { INITIAL_ITEMS, CampusItem } from '../data/mockItems';
+import React, { createContext, useContext, useState } from 'react';
+import { ImageSourcePropType } from 'react-native';
+import { CampusItem, INITIAL_ITEMS } from '../data/mockItems';
+
+interface NewItemInput extends Omit<CampusItem, 'id' | 'isSaved' | 'isClaimed' | 'image'> {
+  imageUri?: string | null;
+}
+
+interface UpdateItemInput extends Omit<CampusItem, 'isSaved' | 'isClaimed' | 'image'> {
+  imageUri?: string | null;
+}
 
 interface ItemsContextType {
   items: CampusItem[];
   toggleSave: (id: string) => void;
   markAsClaimed: (id: string) => void;
+  addItem: (newItem: NewItemInput) => void;
+  updateItem: (updatedItem: UpdateItemInput) => void;
 }
 
 const ItemsContext = createContext<ItemsContextType | undefined>(undefined);
+
+// Make sure this path matches your working path in mockItems.ts!
+const defaultImg = require('../../assets/images/icon.png');
 
 export function ItemsProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CampusItem[]>(INITIAL_ITEMS);
@@ -28,8 +42,38 @@ export function ItemsProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
+  const addItem = ({ imageUri, ...rest }: NewItemInput) => {
+    const imageSource: ImageSourcePropType = imageUri
+      ? { uri: imageUri }
+      : defaultImg;
+
+    const createdItem: CampusItem = {
+      ...rest,
+      id: Date.now().toString(),
+      image: imageSource,
+      isSaved: false,
+      isClaimed: false,
+    };
+    setItems((prev) => [createdItem, ...prev]);
+  };
+
+  const updateItem = ({ id, imageUri, ...rest }: UpdateItemInput) => {
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        return {
+          ...item,
+          ...rest,
+          image: imageUri ? { uri: imageUri } : item.image,
+        };
+      })
+    );
+  };
+
   return (
-    <ItemsContext.Provider value={{ items, toggleSave, markAsClaimed }}>
+    <ItemsContext.Provider
+      value={{ items, toggleSave, markAsClaimed, addItem, updateItem }}
+    >
       {children}
     </ItemsContext.Provider>
   );
