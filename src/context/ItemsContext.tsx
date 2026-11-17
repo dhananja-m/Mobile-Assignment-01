@@ -16,6 +16,7 @@ interface ItemsContextType {
   markAsClaimed: (id: string) => void;
   addItem: (newItem: NewItemInput) => void;
   updateItem: (updatedItem: UpdateItemInput) => void;
+  deleteItem: (id: string) => void;
 }
 
 const ItemsContext = createContext<ItemsContextType | undefined>(undefined);
@@ -70,9 +71,20 @@ export function ItemsProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
+  const deleteItem = (id: string) => {
+    setItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
   return (
     <ItemsContext.Provider
-      value={{ items, toggleSave, markAsClaimed, addItem, updateItem }}
+      value={{
+        items,
+        toggleSave,
+        markAsClaimed,
+        addItem,
+        updateItem,
+        deleteItem,
+      }}
     >
       {children}
     </ItemsContext.Provider>
