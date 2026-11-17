@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import * as Notifications from 'expo-notifications';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import {
     Alert,
@@ -17,7 +17,7 @@ import { useItems } from '../../context/ItemsContext';
 
 export default function ItemDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { items, toggleSave, markAsClaimed, updateItem } = useItems();
+  const { items, toggleSave, markAsClaimed, updateItem, deleteItem } = useItems();
 
   const item = items.find((entry) => entry.id === id);
 
@@ -46,7 +46,7 @@ export default function ItemDetailsScreen() {
     setContact(item.contact);
     setHandover(item.handover);
     setDescription(item.description);
-    setImageUri(null); // Keeps existing image unless a new one is picked
+    setImageUri(null);
     setEditModalVisible(true);
   };
 
@@ -123,6 +123,28 @@ export default function ItemDetailsScreen() {
     }
   };
 
+  const handleDelete = () => {
+    Alert.alert(
+      'Delete Report',
+      `Are you sure you want to delete "${item.title}"? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            deleteItem(item.id);
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(feed)');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 30 }}>
       <Image source={item.image} style={styles.heroImage} />
@@ -191,6 +213,13 @@ export default function ItemDetailsScreen() {
           <Text style={styles.btnText}>Mark as Claimed</Text>
         </Pressable>
       )}
+
+      <Pressable
+        style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.8 }]}
+        onPress={handleDelete}
+      >
+        <Text style={styles.btnText}>Delete Report</Text>
+      </Pressable>
 
       {/* Edit Report Modal */}
       <Modal
@@ -349,6 +378,13 @@ const styles = StyleSheet.create({
   savedActiveBtn: { backgroundColor: '#4b5563' },
   claimBtn: {
     backgroundColor: '#059669',
+    padding: 13,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  deleteBtn: {
+    backgroundColor: '#DC2626',
     padding: 13,
     borderRadius: 10,
     alignItems: 'center',
