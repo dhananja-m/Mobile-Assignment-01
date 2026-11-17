@@ -17,9 +17,7 @@ import { useItems } from '../../context/ItemsContext';
 import { CampusItem } from '../../data/mockItems';
 
 export default function FeedScreen() {
-  const itemsContext = useItems() as any;
-  const items = itemsContext.items ?? [];
-  const addItem = itemsContext.addItem ?? (() => undefined);
+  const { items, addItem } = useItems();
 
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [filterModalVisible, setFilterModalVisible] = useState<boolean>(false);
@@ -64,8 +62,10 @@ export default function FeedScreen() {
       year: 'numeric',
     });
 
+    const submittedTitle = title.trim();
+
     addItem({
-      title: title.trim(),
+      title: submittedTitle,
       category,
       location: location.trim(),
       date: today,
@@ -83,23 +83,27 @@ export default function FeedScreen() {
     setDescription('');
     setAddModalVisible(false);
 
-    // Trigger local notification
-    const { status } = await Notifications.requestPermissionsAsync();
-    if (status === 'granted') {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: `${category} Item Posted!`,
-          body: `"${title.trim()}" is now live on the UniFind campus board.`,
-        },
-        trigger: null,
-      });
+    // Trigger local notification safely
+    try {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status === 'granted') {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: `${category} Item Posted!`,
+            body: `"${submittedTitle}" is now live on the UniFind campus board.`,
+          },
+          trigger: null,
+        });
+      }
+    } catch (error) {
+      console.log('Notification error:', error);
     }
   };
 
   const filteredItems =
     selectedCategory === 'All'
       ? items
-      : items.filter((item: CampusItem) => item.category === selectedCategory);
+      : items.filter((item) => item.category === selectedCategory);
 
   const renderItem = ({ item }: { item: CampusItem }) => (
     <Pressable
