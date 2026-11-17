@@ -23,7 +23,7 @@ export default function RootLayout() {
             title: 'Campus Feed',
             headerShown: false, // Hidden because the Stack inside (feed) has its own header
             tabBarIcon: ({ color }) => (
-              <MaterialCommunityIcons name="compass-outline" size={24} color={color} />
+              <MaterialCommunityIcons name="compass-outline" size={24} color={String(color)} />
             ),
           }}
         />
@@ -34,7 +34,7 @@ export default function RootLayout() {
             headerStyle: { backgroundColor: '#1E3A8A' },
             headerTintColor: '#fff',
             tabBarIcon: ({ color }) => (
-              <MaterialCommunityIcons name="bookmark-check-outline" size={24} color={color} />
+              <MaterialCommunityIcons name="bookmark-check-outline" size={24} color={String(color)} />
             ),
           }}
         />
