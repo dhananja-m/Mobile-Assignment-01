@@ -18,10 +18,13 @@ import {
 import { useItems } from '../../context/ItemsContext';
 import { CampusItem } from '../../data/mockItems';
 
+type SortOption = 'newest' | 'oldest' | 'nameAsc' | 'nameDesc';
+
 export default function FeedScreen() {
   const { items, addItem } = useItems();
 
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [filterModalVisible, setFilterModalVisible] = useState<boolean>(false);
 
   // Add Lost/Found Item Modal States
@@ -56,7 +59,10 @@ export default function FeedScreen() {
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permission Required', 'Please allow photo library access to attach an item photo.');
+      Alert.alert(
+        'Permission Required',
+        'Please allow photo library access to attach an item photo.'
+      );
       return;
     }
 
@@ -124,10 +130,30 @@ export default function FeedScreen() {
     }
   };
 
+  // 1. Filter by Category
   const filteredItems =
     selectedCategory === 'All'
       ? items
       : items.filter((item) => item.category === selectedCategory);
+
+  // 2. Sort Filtered Results (Time-wise & Name-wise)
+  const displayedItems = [...filteredItems].sort((a, b) => {
+    if (sortBy === 'nameAsc') {
+      return a.title.localeCompare(b.title);
+    }
+    if (sortBy === 'nameDesc') {
+      return b.title.localeCompare(a.title);
+    }
+    // Parse date strings (falls back to numeric ID timestamp if dates match)
+    const timeA = new Date(a.date).getTime() || Number(a.id) || 0;
+    const timeB = new Date(b.date).getTime() || Number(b.id) || 0;
+
+    if (sortBy === 'oldest') {
+      return timeA - timeB;
+    }
+    // Default: 'newest'
+    return timeB - timeA;
+  });
 
   const renderItem = ({ item }: { item: CampusItem }) => (
     <Pressable
@@ -162,6 +188,13 @@ export default function FeedScreen() {
     </Pressable>
   );
 
+  const sortOptions: { key: SortOption; label: string }[] = [
+    { key: 'newest', label: 'Time: Newest First' },
+    { key: 'oldest', label: 'Time: Oldest First' },
+    { key: 'nameAsc', label: 'Name: A → Z' },
+    { key: 'nameDesc', label: 'Name: Z → A' },
+  ];
+
   return (
     <View style={styles.container}>
       {/* Top Status & Action Bar */}
@@ -178,19 +211,19 @@ export default function FeedScreen() {
             style={({ pressed }) => [styles.filterBtn, pressed && { opacity: 0.7 }]}
             onPress={() => setFilterModalVisible(true)}
           >
-            <Text style={styles.filterBtnText}>Filter: {selectedCategory}</Text>
+            <Text style={styles.filterBtnText}>Filter & Sort</Text>
           </Pressable>
         </View>
       </View>
 
       <FlatList
-        data={filteredItems}
+        data={displayedItems}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={{ paddingBottom: 20 }}
       />
 
-      {/* Modal 1: Filter by Category */}
+      {/* Modal 1: Filter & Sort */}
       <Modal
         visible={filterModalVisible}
         transparent
@@ -199,35 +232,60 @@ export default function FeedScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Filter by Category</Text>
-            {['All', 'Found', 'Lost', 'Exchange'].map((cat) => (
-              <Pressable
-                key={cat}
-                style={[
-                  styles.modalOption,
-                  selectedCategory === cat && styles.modalOptionActive,
-                ]}
-                onPress={() => {
-                  setSelectedCategory(cat);
-                  setFilterModalVisible(false);
-                }}
-              >
-                <Text
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalTitle}>Filter & Sort Feed</Text>
+
+              <Text style={styles.sectionHeader}>Category</Text>
+              <View style={styles.catRow}>
+                {['All', 'Found', 'Lost', 'Exchange'].map((cat) => (
+                  <Pressable
+                    key={cat}
+                    style={[
+                      styles.catChip,
+                      selectedCategory === cat && styles.catChipActive,
+                    ]}
+                    onPress={() => setSelectedCategory(cat)}
+                  >
+                    <Text
+                      style={[
+                        styles.catChipText,
+                        selectedCategory === cat && { color: 'white' },
+                      ]}
+                    >
+                      {cat}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <Text style={styles.sectionHeader}>Sort By</Text>
+              {sortOptions.map((option) => (
+                <Pressable
+                  key={option.key}
                   style={[
-                    styles.modalOptionText,
-                    selectedCategory === cat && { color: 'white' },
+                    styles.modalOption,
+                    sortBy === option.key && styles.modalOptionActive,
                   ]}
+                  onPress={() => setSortBy(option.key)}
                 >
-                  {cat}
-                </Text>
+                  <Text
+                    style={[
+                      styles.modalOptionText,
+                      sortBy === option.key && { color: 'white' },
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))}
+
+              <Pressable
+                style={styles.applyBtn}
+                onPress={() => setFilterModalVisible(false)}
+              >
+                <Text style={{ color: 'white', fontWeight: 'bold' }}>Apply</Text>
               </Pressable>
-            ))}
-            <Pressable
-              style={styles.cancelBtn}
-              onPress={() => setFilterModalVisible(false)}
-            >
-              <Text style={{ color: '#555', fontWeight: 'bold' }}>Close</Text>
-            </Pressable>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -405,17 +463,30 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 12,
   },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 14, textAlign: 'center' },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12, textAlign: 'center' },
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#4b5563',
+    marginBottom: 6,
+    marginTop: 4,
+  },
   modalOption: {
-    padding: 12,
+    padding: 10,
     backgroundColor: '#f3f4f6',
     borderRadius: 8,
     marginBottom: 8,
     alignItems: 'center',
   },
   modalOptionActive: { backgroundColor: '#1E3A8A' },
-  modalOptionText: { fontSize: 15, fontWeight: 'bold' },
-  cancelBtn: { marginTop: 10, alignItems: 'center', padding: 8 },
+  modalOptionText: { fontSize: 14, fontWeight: 'bold', color: '#1f2937' },
+  applyBtn: {
+    marginTop: 8,
+    backgroundColor: '#059669',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
   catRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, gap: 6 },
   catChip: {
     flex: 1,
@@ -425,7 +496,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   catChipActive: { backgroundColor: '#1E3A8A' },
-  catChipText: { fontWeight: 'bold', fontSize: 13, color: '#1f2937' },
+  catChipText: { fontWeight: 'bold', fontSize: 12, color: '#1f2937' },
   photoRow: {
     flexDirection: 'row',
     alignItems: 'center',
