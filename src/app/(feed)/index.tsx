@@ -33,6 +33,14 @@ export default function HomeScreen() {
   const lostCount = items.filter((i) => i.category === 'Lost' && !i.isClaimed).length;
   const foundCount = items.filter((i) => i.category === 'Found' && !i.isClaimed).length;
   const exchangeCount = items.filter((i) => i.category === 'Exchange' && !i.isClaimed).length;
+  const claimedCount = items.filter((i) => i.isClaimed).length;
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning 👋';
+    if (hour < 18) return 'Good Afternoon 👋';
+    return 'Good Evening 👋';
+  };
 
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -108,12 +116,37 @@ export default function HomeScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 30 }}>
-      {/* Welcome Hero Banner */}
+      {/* Modern Welcome Hero Banner */}
       <View style={styles.heroCard}>
-        <Text style={styles.heroTitle}>Welcome to UniFind</Text>
-        <Text style={styles.heroSubtitle}>
-          Campus Lost & Found + Student Item Exchange Portal
-        </Text>
+        <View style={styles.heroTopRow}>
+          <View style={styles.heroTextGroup}>
+            <View style={styles.campusBadge}>
+              <MaterialCommunityIcons name="school-outline" size={14} color="#93c5fd" />
+              <Text style={styles.campusBadgeText}>CAMPUS PORTAL</Text>
+            </View>
+            <Text style={styles.greetingText}>{getGreeting()}</Text>
+            <Text style={styles.heroTitle}>Welcome to UniFind</Text>
+            <Text style={styles.heroSubtitle}>
+              Campus Lost & Found + Student Item Exchange
+            </Text>
+          </View>
+
+          <View style={styles.heroIconBox}>
+            <MaterialCommunityIcons name="compass-rose" size={40} color="#ffffff" />
+          </View>
+        </View>
+
+        <View style={styles.heroDivider} />
+
+        <View style={styles.heroFooterRow}>
+          <View style={styles.liveDotRow}>
+            <View style={styles.liveDot} />
+            <Text style={styles.heroFooterText}>Board Live</Text>
+          </View>
+          <Text style={styles.heroFooterText}>
+            {claimedCount} {claimedCount === 1 ? 'Item' : 'Items'} Reunited
+          </Text>
+        </View>
       </View>
 
       {/* Live Campus Summary Cards */}
@@ -270,13 +303,92 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#f0f4f8' },
   heroCard: {
     backgroundColor: '#1E3A8A',
-    padding: 20,
-    borderRadius: 14,
+    padding: 18,
+    borderRadius: 16,
     marginBottom: 18,
-    elevation: 3,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#2563EB',
   },
-  heroTitle: { fontSize: 22, fontWeight: 'bold', color: 'white', marginBottom: 4 },
-  heroSubtitle: { fontSize: 13, color: '#dbeafe' },
+  heroTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  heroTextGroup: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  campusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 8,
+    gap: 5,
+  },
+  campusBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#93c5fd',
+    letterSpacing: 0.8,
+  },
+  greetingText: {
+    fontSize: 13,
+    color: '#bfdbfe',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  heroTitle: {
+    fontSize: 23,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  heroSubtitle: {
+    fontSize: 12.5,
+    color: '#dbeafe',
+    lineHeight: 17,
+  },
+  heroIconBox: {
+    width: 62,
+    height: 62,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  heroDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    marginVertical: 12,
+  },
+  heroFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  liveDotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#34D399',
+  },
+  heroFooterText: {
+    fontSize: 12,
+    color: '#e0e7ff',
+    fontWeight: '600',
+  },
   sectionTitle: {
     fontSize: 15,
     fontWeight: 'bold',
