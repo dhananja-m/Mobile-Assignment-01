@@ -137,7 +137,7 @@ export default function ItemDetailsScreen() {
             if (router.canGoBack()) {
               router.back();
             } else {
-              router.replace('/(feed)');
+              router.replace('/(feed)/feed' as any);
             }
           },
         },

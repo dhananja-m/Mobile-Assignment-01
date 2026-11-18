@@ -80,7 +80,7 @@ export default function SavedItemsScreen() {
                 styles.browseBtn,
                 pressed && { opacity: 0.8 },
               ]}
-              onPress={() => router.push('/(feed)')}
+              onPress={() => router.push('/(feed)/feed' as any)}
             >
               <Text style={styles.browseBtnText}>Browse Campus Feed</Text>
             </Pressable>
